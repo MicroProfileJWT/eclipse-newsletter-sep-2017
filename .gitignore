@@ -1,1 +1,7 @@
-# Created by .ignore support plugin (hsz.mobi)
+# User-specific stuff:
+.idea/
+
+## File-based project format:
+*.iws
+*.iml
+*.ipr
