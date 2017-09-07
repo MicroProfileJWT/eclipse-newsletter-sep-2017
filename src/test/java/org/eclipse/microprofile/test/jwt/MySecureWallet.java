@@ -1,15 +1,18 @@
 package org.eclipse.microprofile.test.jwt;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import javax.annotation.security.DeclareRoles;
 import javax.annotation.security.DenyAll;
 import javax.annotation.security.RolesAllowed;
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.inject.Instance;
 import javax.inject.Inject;
 import javax.json.Json;
 import javax.json.JsonNumber;
 import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -19,6 +22,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.SecurityContext;
 
+import org.eclipse.microprofile.jwt.Claim;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 @ApplicationScoped
@@ -32,6 +36,9 @@ public class MySecureWallet {
     private BigDecimal ethereumXrate = new BigDecimal("328.0000");
     @Inject
     private JsonWebToken jwt;
+    @Inject
+    @Claim("warningLimit")
+    private Instance<Optional<JsonNumber>> warningLimitInstance;
 
     @GET
     @Path("/balance")
@@ -72,11 +79,18 @@ public class MySecureWallet {
     }
 
     private JsonObject generateBalanceInfo() {
-        JsonObject result = Json.createObjectBuilder()
+        JsonObjectBuilder result = Json.createObjectBuilder()
                 .add("usd", usdBalance)
                 .add("bitcoin", usdBalance.divide(bitcoinXrate, BigDecimal.ROUND_HALF_EVEN))
                 .add("ethereum", usdBalance.divide(ethereumXrate, BigDecimal.ROUND_HALF_EVEN))
-                .build();
-        return result;
+                ;
+
+        Optional<JsonNumber> warningLimit = warningLimitInstance.get();
+        if(warningLimit.isPresent() && warningLimit.get().doubleValue() > usdBalance.doubleValue()) {
+            String warningMsg = String.format("balance is below warning limit: %s", warningLimit.get());
+            result.add("warning", warningMsg);
+        }
+
+        return result.build();
     }
 }

@@ -23,6 +23,9 @@ import org.testng.Assert;
 import org.testng.Reporter;
 import org.testng.annotations.Test;
 
+/**
+ * Tests illustrating the MP-JWT functionality
+ */
 public class MySecureWalletTest extends Arquillian {
 
     /**
@@ -43,15 +46,16 @@ public class MySecureWalletTest extends Arquillian {
         //System.setProperty("swarm.logging", "DEBUG");
         //System.setProperty("swarm.debug.port", "8888");
 
-        // Get the
+        // Get the public key of the token signer
         URL publicKey = MySecureWalletTest.class.getResource("/publicKey.pem");
         WebArchive webArchive = ShrinkWrap
                 .create(WebArchive.class, "MySecureEndpoint.war")
-                //
+                // Place the public key in the war as /MP-JWT-SIGNER - Wildfly-Swarm specific
                 .addAsManifestResource(publicKey, "/MP-JWT-SIGNER")
                 .addClass(MySecureWallet.class)
                 .addClass(MyJaxrsApp.class)
                 .addAsWebInfResource(EmptyAsset.INSTANCE, "beans.xml")
+                // Add Wildfly-Swarm specific configuration of the security domain
                 .addAsResource("project-defaults.yml", "/project-defaults.yml")
                 .addAsWebInfResource("jwt-roles.properties", "classes/jwt-roles.properties")
                 .setWebXML("WEB-INF/web.xml")
@@ -67,9 +71,9 @@ public class MySecureWalletTest extends Arquillian {
         String token = TokenUtils.generateTokenString("/Token1.json");
 
         String uri = baseURL.toExternalForm() + "/wallet/balance";
-        WebTarget echoEndpointTarget = ClientBuilder.newClient()
+        WebTarget target = ClientBuilder.newClient()
                 .target(uri);
-        Response response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
         JsonObject reply = response.readEntity(JsonObject.class);
         Reporter.log(reply.toString());
@@ -78,67 +82,107 @@ public class MySecureWalletTest extends Arquillian {
     @RunAsClient
     @Test(description = "Verify that jdoe can debit balance using Token1.json")
     public void debitBalance() throws Exception {
-        Reporter.log("Begin checkBalance");
+        Reporter.log("Begin debitBalance");
         String token = TokenUtils.generateTokenString("/Token1.json");
 
         String uri = baseURL.toExternalForm() + "/wallet/debit";
-        WebTarget echoEndpointTarget = ClientBuilder.newClient()
+        WebTarget target = ClientBuilder.newClient()
                 .target(uri)
                 .queryParam("amount", "500");
-        Response response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
-        Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
-        JsonObject reply = response.readEntity(JsonObject.class);
-        Reporter.log(reply.toString());
-        System.out.println(reply.toString());
-    }    @RunAsClient
-    @Test(description = "Verify that jdoe can issue debit > $1000 using Token1.json")
-    public void bigSpenderDebitBalance() throws Exception {
-        Reporter.log("Begin checkBalance");
-        String token = TokenUtils.generateTokenString("/Token1.json");
-
-        String uri = baseURL.toExternalForm() + "/wallet/debit";
-        WebTarget echoEndpointTarget = ClientBuilder.newClient()
-                .target(uri)
-                .queryParam("amount", "1500");
-        Response response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
         JsonObject reply = response.readEntity(JsonObject.class);
         Reporter.log(reply.toString());
         System.out.println(reply.toString());
     }
+
+    @RunAsClient
+    @Test(description = "Verify that jdoe can issue debit > $1000 using Token1.json")
+    public void bigSpenderDebitBalance() throws Exception {
+        Reporter.log("Begin bigSpenderDebitBalance");
+        String token = TokenUtils.generateTokenString("/Token1.json");
+
+        String uri = baseURL.toExternalForm() + "/wallet/debit";
+        WebTarget target = ClientBuilder.newClient()
+                .target(uri)
+                .queryParam("amount", "1500");
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
+        JsonObject reply = response.readEntity(JsonObject.class);
+        Reporter.log(reply.toString());
+        System.out.println(reply.toString());
+    }
+
     @RunAsClient
     @Test(description = "Verify that jdoe can credit balance using Token1.json")
     public void creditBalance() throws Exception {
-        Reporter.log("Begin checkBalance");
+        Reporter.log("Begin creditBalance");
         String token = TokenUtils.generateTokenString("/Token1.json");
 
         String uri = baseURL.toExternalForm() + "/wallet/credit";
-        WebTarget echoEndpointTarget = ClientBuilder.newClient()
+        WebTarget target = ClientBuilder.newClient()
                 .target(uri)
                 .queryParam("amount", "1500");
-        Response response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
         JsonObject reply = response.readEntity(JsonObject.class);
         Reporter.log(reply.toString());
         System.out.println(reply.toString());
     }
+
     @RunAsClient
-    @Test(description = "Verify that jdoe can credit balance using Token1.json")
-    public void bigDebitBalanceFail() throws Exception {
-        Reporter.log("Begin checkBalance");
+    @Test(description = "Verify that jdoe can debit balance and see a warning about Token1.json warningLimit")
+    public void debitTillWarningLimit() throws Exception {
+        Reporter.log("Begin debitTillWarningLimit");
         String token = TokenUtils.generateTokenString("/Token1.json");
 
         String uri = baseURL.toExternalForm() + "/wallet/debit";
-        WebTarget echoEndpointTarget = ClientBuilder.newClient()
+        WebTarget target = ClientBuilder.newClient()
+                .target(uri)
+                .queryParam("amount", "1500");
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
+        JsonObject reply = response.readEntity(JsonObject.class);
+        Reporter.log(reply.toString());
+        System.out.println(reply.toString());
+        while(!reply.containsKey("warning")) {
+            response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+            reply = response.readEntity(JsonObject.class);
+            System.out.println(reply.toString());
+        }
+        System.out.printf("Saw warning\n");
+
+        // Update the token
+        token = TokenUtils.generateTokenString("/Token1-50000-limit.json");
+        response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        reply = response.readEntity(JsonObject.class);
+        System.out.println(reply.toString());
+        Assert.assertTrue(!reply.containsKey("warning"), "warning should be cleared");
+        while(!reply.containsKey("warning")) {
+            response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+            reply = response.readEntity(JsonObject.class);
+            System.out.println(reply.toString());
+        }
+        System.out.printf("Saw warning\n");
+    }
+
+    @RunAsClient
+    @Test(description = "Verify that jdoe cannot debit amount about the $2500 spendingLimit of Token1.json")
+    public void bigDebitBalanceFail() throws Exception {
+        Reporter.log("Begin bigDebitBalanceFail");
+        String token = TokenUtils.generateTokenString("/Token1.json");
+
+        String uri = baseURL.toExternalForm() + "/wallet/debit";
+        WebTarget target = ClientBuilder.newClient()
                 .target(uri)
                 .queryParam("amount", "3000");
-        Response response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_BAD_REQUEST);
 
         uri = baseURL.toExternalForm() + "/wallet/balance";
-        echoEndpointTarget = ClientBuilder.newClient()
+        target = ClientBuilder.newClient()
                 .target(uri);
-        response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
         JsonObject reply = response.readEntity(JsonObject.class);
         Reporter.log(reply.toString());
@@ -147,20 +191,20 @@ public class MySecureWalletTest extends Arquillian {
     @RunAsClient
     @Test(description = "Verify that jdoe2 cannot debit > 1000 using Token2.json")
     public void bigSpenderDebitBalanceFail() throws Exception {
-        Reporter.log("Begin checkBalance");
+        Reporter.log("Begin bigSpenderDebitBalanceFail");
         String token = TokenUtils.generateTokenString("/Token2.json");
 
         String uri = baseURL.toExternalForm() + "/wallet/debit";
-        WebTarget echoEndpointTarget = ClientBuilder.newClient()
+        WebTarget target = ClientBuilder.newClient()
                 .target(uri)
                 .queryParam("amount", "1500");
-        Response response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_FORBIDDEN);
 
         uri = baseURL.toExternalForm() + "/wallet/balance";
-        echoEndpointTarget = ClientBuilder.newClient()
+        target = ClientBuilder.newClient()
                 .target(uri);
-        response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
         JsonObject reply = response.readEntity(JsonObject.class);
         Reporter.log(reply.toString());
@@ -170,13 +214,13 @@ public class MySecureWalletTest extends Arquillian {
     @RunAsClient
     @Test(description = "Verify that jdoe3 has no access via Token-noaccess.json")
     public void checkBalanceNoAccess() throws Exception {
-        Reporter.log("Begin checkBalance");
+        Reporter.log("Begin checkBalanceNoAccess");
         String token = TokenUtils.generateTokenString("/Token-noaccess.json");
 
         String uri = baseURL.toExternalForm() + "/wallet/balance";
-        WebTarget echoEndpointTarget = ClientBuilder.newClient()
+        WebTarget target = ClientBuilder.newClient()
                 .target(uri);
-        Response response = echoEndpointTarget.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_FORBIDDEN);
     }
 }

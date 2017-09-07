@@ -12,5 +12,5 @@
     "ViewBalance", "Debtor", "Creditor"
   ],
   "spendingLimit": 2500,
-  "warningLimit": 90000
+  "warningLimit": 50000
 }
