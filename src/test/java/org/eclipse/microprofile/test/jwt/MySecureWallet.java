@@ -34,8 +34,10 @@ public class MySecureWallet {
     private BigDecimal usdBalance = new BigDecimal("100000.0000");
     private BigDecimal bitcoinXrate = new BigDecimal("4538.0000");
     private BigDecimal ethereumXrate = new BigDecimal("328.0000");
+
     @Inject
     private JsonWebToken jwt;
+
     @Inject
     @Claim("warningLimit")
     private Instance<Optional<JsonNumber>> warningLimitInstance;
@@ -52,13 +54,14 @@ public class MySecureWallet {
     @Path("/debit")
     @Produces(MediaType.APPLICATION_JSON)
     @RolesAllowed({"Debtor", "Debtor2"})
-    public Response debit(@QueryParam("amount") String amount, @Context SecurityContext securityContext) {
+    public Response debit(@QueryParam("amount") String amount,
+                          @Context SecurityContext securityContext) {
         Double damount = Double.valueOf(amount);
-        if(damount > bigSpenderLimit) {
-            if(securityContext.isUserInRole("BigSpender")) {
+        if (damount > bigSpenderLimit) {
+            if (securityContext.isUserInRole("BigSpender")) {
                 // Validate the spending limit from the token claim
                 JsonNumber spendingLimit = jwt.getClaim("spendingLimit");
-                if(spendingLimit == null || spendingLimit.doubleValue() < damount) {
+                if (spendingLimit == null || spendingLimit.doubleValue() < damount) {
                     return Response.status(Response.Status.BAD_REQUEST).build();
                 }
             } else {
@@ -79,18 +82,22 @@ public class MySecureWallet {
     }
 
     private JsonObject generateBalanceInfo() {
+        BigDecimal balanceInBitcoins = usdBalance.divide(bitcoinXrate, BigDecimal.ROUND_HALF_EVEN);
+        BigDecimal balanceInEthereum = usdBalance.divide(ethereumXrate, BigDecimal.ROUND_HALF_EVEN);
         JsonObjectBuilder result = Json.createObjectBuilder()
                 .add("usd", usdBalance)
-                .add("bitcoin", usdBalance.divide(bitcoinXrate, BigDecimal.ROUND_HALF_EVEN))
-                .add("ethereum", usdBalance.divide(ethereumXrate, BigDecimal.ROUND_HALF_EVEN))
-                ;
+                .add("bitcoin", balanceInBitcoins)
+                .add("ethereum", balanceInEthereum);
 
         Optional<JsonNumber> warningLimit = warningLimitInstance.get();
-        if(warningLimit.isPresent() && warningLimit.get().doubleValue() > usdBalance.doubleValue()) {
-            String warningMsg = String.format("balance is below warning limit: %s", warningLimit.get());
-            result.add("warning", warningMsg);
+        if (warningLimit.isPresent()) {
+            if (warningLimit.get().doubleValue() > usdBalance.doubleValue()) {
+                String warningMsg = String.format("balance is below warning limit: %s", warningLimit.get());
+                result.add("warning", warningMsg);
+            }
         }
 
         return result.build();
     }
+
 }

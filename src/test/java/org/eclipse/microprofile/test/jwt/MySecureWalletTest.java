@@ -152,12 +152,14 @@ public class MySecureWalletTest extends Arquillian {
         }
         System.out.printf("Saw warning\n");
 
-        // Update the token
+        // Update the token with a new lower warningLimit claim, and continue debiting until this level is breached
         token = TokenUtils.generateTokenString("/Token1-50000-limit.json");
         response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         reply = response.readEntity(JsonObject.class);
         System.out.println(reply.toString());
+        // There should no longer be a warning as the new warningLimit claim should have been seen
         Assert.assertTrue(!reply.containsKey("warning"), "warning should be cleared");
+        // Now continue debiting
         while(!reply.containsKey("warning")) {
             response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
             reply = response.readEntity(JsonObject.class);
@@ -172,22 +174,35 @@ public class MySecureWalletTest extends Arquillian {
         Reporter.log("Begin bigDebitBalanceFail");
         String token = TokenUtils.generateTokenString("/Token1.json");
 
-        String uri = baseURL.toExternalForm() + "/wallet/debit";
+        // First get the current balance
+        String uri = baseURL.toExternalForm() + "/wallet/balance";
         WebTarget target = ClientBuilder.newClient()
+                .target(uri);
+        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        JsonObject origBalance = response.readEntity(JsonObject.class);
+        Assert.assertTrue(origBalance.containsKey("usd"));
+        System.out.println(origBalance.toString());
+
+        // Now try a big debit that is above the $2500 spendingLimit claim
+        uri = baseURL.toExternalForm() + "/wallet/debit";
+        target = ClientBuilder.newClient()
                 .target(uri)
                 .queryParam("amount", "3000");
-        Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
+        response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_BAD_REQUEST);
 
+        // Now retrieve the balance again to make sure it has not changed
         uri = baseURL.toExternalForm() + "/wallet/balance";
         target = ClientBuilder.newClient()
                 .target(uri);
         response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_OK);
-        JsonObject reply = response.readEntity(JsonObject.class);
-        Reporter.log(reply.toString());
-        System.out.println(reply.toString());
+        JsonObject newBalance = response.readEntity(JsonObject.class);
+        Reporter.log(newBalance.toString());
+        System.out.println(newBalance.toString());
+        Assert.assertEquals(origBalance.getJsonNumber("usd"), newBalance.getJsonNumber("usd"));
     }
+
     @RunAsClient
     @Test(description = "Verify that jdoe2 cannot debit > 1000 using Token2.json")
     public void bigSpenderDebitBalanceFail() throws Exception {
@@ -223,4 +238,17 @@ public class MySecureWalletTest extends Arquillian {
         Response response = target.request(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).get();
         Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_FORBIDDEN);
     }
+
+    @RunAsClient
+    @Test(description = "Verify that attempting to access the balance without a token fails")
+    public void checkBalanceNoAuth() throws Exception {
+        Reporter.log("Begin checkBalanceNoAuth");
+
+        String uri = baseURL.toExternalForm() + "/wallet/balance";
+        WebTarget target = ClientBuilder.newClient()
+                .target(uri);
+        Response response = target.request(MediaType.APPLICATION_JSON).get();
+        Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_UNAUTHORIZED);
+    }
+
 }
