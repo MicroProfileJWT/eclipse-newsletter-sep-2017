@@ -25,18 +25,10 @@
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <version.wildfly.swarm>2017.10.0-MP_12-RC1</version.wildfly.swarm>
-    <version.eclipse.jwt>1.0-RC10</version.eclipse.jwt>
+    <version.wildfly.swarm>2017.10.0-MP_12-RC3</version.wildfly.swarm>
+    <version.eclipse.jwt>1.0</version.eclipse.jwt>
     <version.testng>6.10</version.testng>
   </properties>
-
-  <repositories>
-    <repository>
-      <id>repo.eclipse.org</id>
-      <name>Eclipse MicroProfile Repository - Releases</name>
-      <url>https://repo.eclipse.org/content/repositories/microprofile-releases/</url>
-    </repository>
-  </repositories>
 
   <dependencyManagement>
     <dependencies>
@@ -66,8 +58,13 @@
     </dependency>
     <dependency>
       <groupId>org.eclipse.microprofile.jwt</groupId>
+      <artifactId>microprofile-jwt-auth-api</artifactId>
+      <version>${version.eclipse.jwt}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.microprofile.jwt</groupId>
       <artifactId>microprofile-jwt-auth-tck</artifactId>
-      <version>1.0-RC10</version>
+      <version>${version.eclipse.jwt}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -94,7 +91,6 @@
     <dependency>
       <groupId>org.wildfly.swarm</groupId>
       <artifactId>microprofile-jwt</artifactId>
-      <version>2017.10.0-MP_12-RC1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
