@@ -25,7 +25,7 @@
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <version.wildfly.swarm>2017.10.0-MP_12-RC3</version.wildfly.swarm>
+    <version.wildfly.swarm>2018.2.0.Final</version.wildfly.swarm>
     <version.eclipse.jwt>1.0</version.eclipse.jwt>
     <version.testng>6.10</version.testng>
   </properties>
